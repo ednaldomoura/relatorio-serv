@@ -1,12 +1,10 @@
 // Function to get form data
 function getFormData() {
     const dataInicio = document.getElementById('data-inicio').value;
-    const dataFinalizado = document.getElementById('data-finalizado').value;
     const obs = document.getElementById('obs').value;
 
     return {
         dataInicio: dataInicio,
-        dataFinalizado: dataFinalizado || 'Não finalizado', // Default if not provided
         observacoes: obs || 'Nenhuma observação', // Default if not provided
         timestamp: new Date().toISOString() // To uniquely identify and sort reports
     };
@@ -50,7 +48,6 @@ function displaySavedReports() {
         reportCard.innerHTML = `
             <p class="font-semibold text-lg text-blue-700">Relatório #${reports.length - index}</p>
             <p><span class="font-medium">Início:</span> ${report.dataInicio}</p>
-            <p><span class="font-medium">Finalização:</span> ${report.dataFinalizado}</p>
             <p><span class="font-medium">Obs:</span> ${report.observacoes}</p>
             <div class="mt-3 flex gap-2 justify-end">
                 <button onclick="excluirRelatorio(${index})" class="bg-red-400 text-white px-3 py-1 rounded hover:bg-red-500 transition text-sm">Excluir</button>
@@ -63,10 +60,6 @@ function displaySavedReports() {
 // Function to delete a specific report
 function excluirRelatorio(indexToRemove) {
     let reports = JSON.parse(localStorage.getItem('serviceReports')) || [];
-    // Adjust index because we sort for display but store unsorted
-    // A more robust solution might use unique IDs for each report
-    // For simplicity, we'll re-sort and remove by the displayed index.
-    // This requires sorting before removing to ensure the correct item is deleted.
     reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort the array as it's displayed
     if (confirm("Tem certeza que deseja excluir este relatório?")) {
         reports.splice(indexToRemove, 1); // Remove the item at the given index
@@ -74,7 +67,6 @@ function excluirRelatorio(indexToRemove) {
         displaySavedReports(); // Refresh the list
     }
 }
-
 
 // Function to clear all saved reports
 function limparRelatorios() {
@@ -85,13 +77,12 @@ function limparRelatorios() {
     }
 }
 
-
 // Function to export current form data to CSV
 function exportarCSV() {
     const report = getFormData();
     const csvContent = "data:text/csv;charset=utf-8,"
-        + "Data de Início,Data da Finalização,Observações\n"
-        + `"${report.dataInicio}","${report.dataFinalizado}","${report.observacoes.replace(/"/g, '""')}"`; // Handle quotes in observations
+        + "Data de Início,Observações\n"
+        + `"${report.dataInicio}","${report.observacoes.replace(/"/g, '""')}"`; // Handle quotes in observations
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -106,7 +97,6 @@ function exportarCSV() {
 // Function to export current form data to PDF
 async function exportarPDF() {
     const report = getFormData();
-    // jsPDF is available globally via the script tag
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
@@ -115,12 +105,10 @@ async function exportarPDF() {
 
     doc.setFontSize(12);
     doc.text(`Data de Início: ${report.dataInicio}`, 10, 30);
-    doc.text(`Data de Finalização: ${report.dataFinalizado}`, 10, 40);
-    doc.text("Observações:", 10, 50);
+    doc.text("Observações:", 10, 40);
 
-    // Split text to fit within PDF width
-    const splitObs = doc.splitTextToSize(report.observacoes, 180); // Max width 180mm
-    doc.text(splitObs, 10, 60);
+    const splitObs = doc.splitTextToSize(report.observacoes, 180);
+    doc.text(splitObs, 10, 50);
 
     doc.save("relatorio_servico.pdf");
     alert("Relatório exportado como PDF!");
@@ -133,7 +121,6 @@ function exportarEmail() {
     const body = encodeURIComponent(
         `Detalhes do Relatório:\n\n` +
         `Data de Início: ${report.dataInicio}\n` +
-        `Data da Finalização: ${report.dataFinalizado}\n` +
         `Observações: ${report.observacoes}`
     );
 
