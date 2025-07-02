@@ -1,129 +1,145 @@
-// Função para exportar os dados do formulário para CSV
+// Function to get form data
+function getFormData() {
+    const dataInicio = document.getElementById('data-inicio').value;
+    const dataFinalizado = document.getElementById('data-finalizado').value;
+    const obs = document.getElementById('obs').value;
+
+    return {
+        dataInicio: dataInicio,
+        dataFinalizado: dataFinalizado || 'Não finalizado', // Default if not provided
+        observacoes: obs || 'Nenhuma observação', // Default if not provided
+        timestamp: new Date().toISOString() // To uniquely identify and sort reports
+    };
+}
+
+// Function to save a report to localStorage
+function salvarRelatorio() {
+    const report = getFormData();
+    if (!report.dataInicio) {
+        alert("Por favor, preencha a Data de Início.");
+        return;
+    }
+
+    let reports = JSON.parse(localStorage.getItem('serviceReports')) || [];
+    reports.push(report);
+    localStorage.setItem('serviceReports', JSON.stringify(reports));
+
+    alert("Relatório salvo com sucesso!");
+    displaySavedReports(); // Update the displayed list
+    document.getElementById('reportForm').reset(); // Clear the form
+}
+
+// Function to display saved reports on the screen
+function displaySavedReports() {
+    const savedReportsList = document.getElementById('saved-reports-list');
+    savedReportsList.innerHTML = ''; // Clear previous entries
+
+    let reports = JSON.parse(localStorage.getItem('serviceReports')) || [];
+
+    if (reports.length === 0) {
+        savedReportsList.innerHTML = '<p class="text-center text-gray-500">Nenhum relatório salvo ainda.</p>';
+        return;
+    }
+
+    // Sort reports by timestamp, newest first
+    reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    reports.forEach((report, index) => {
+        const reportCard = document.createElement('div');
+        reportCard.className = 'bg-gray-50 p-4 rounded-md shadow-sm border border-gray-200';
+        reportCard.innerHTML = `
+            <p class="font-semibold text-lg text-blue-700">Relatório #${reports.length - index}</p>
+            <p><span class="font-medium">Início:</span> ${report.dataInicio}</p>
+            <p><span class="font-medium">Finalização:</span> ${report.dataFinalizado}</p>
+            <p><span class="font-medium">Obs:</span> ${report.observacoes}</p>
+            <div class="mt-3 flex gap-2 justify-end">
+                <button onclick="excluirRelatorio(${index})" class="bg-red-400 text-white px-3 py-1 rounded hover:bg-red-500 transition text-sm">Excluir</button>
+            </div>
+        `;
+        savedReportsList.appendChild(reportCard);
+    });
+}
+
+// Function to delete a specific report
+function excluirRelatorio(indexToRemove) {
+    let reports = JSON.parse(localStorage.getItem('serviceReports')) || [];
+    // Adjust index because we sort for display but store unsorted
+    // A more robust solution might use unique IDs for each report
+    // For simplicity, we'll re-sort and remove by the displayed index.
+    // This requires sorting before removing to ensure the correct item is deleted.
+    reports.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)); // Sort the array as it's displayed
+    if (confirm("Tem certeza que deseja excluir este relatório?")) {
+        reports.splice(indexToRemove, 1); // Remove the item at the given index
+        localStorage.setItem('serviceReports', JSON.stringify(reports));
+        displaySavedReports(); // Refresh the list
+    }
+}
+
+
+// Function to clear all saved reports
+function limparRelatorios() {
+    if (confirm("Tem certeza que deseja limpar TODOS os relatórios salvos?")) {
+        localStorage.removeItem('serviceReports');
+        displaySavedReports(); // Update the display
+        alert("Todos os relatórios foram limpos.");
+    }
+}
+
+
+// Function to export current form data to CSV
 function exportarCSV() {
-  const servico = document.getElementById('servico').value;
-  const executado = document.getElementById('executado').value;
-  const finalizado = document.getElementById('finalizado').value;
-  const obs = document.getElementById('obs').value;
-  const csv = `Serviço a ser realizado,Serviço executado por,Serviço finalizado,Observações\n"${servico}","${executado}","${finalizado}","${obs}"`;
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'relatorio-servico.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+    const report = getFormData();
+    const csvContent = "data:text/csv;charset=utf-8,"
+        + "Data de Início,Data da Finalização,Observações\n"
+        + `"${report.dataInicio}","${report.dataFinalizado}","${report.observacoes.replace(/"/g, '""')}"`; // Handle quotes in observations
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "relatorio_servico.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    alert("Relatório exportado como CSV!");
 }
 
-// Função para exportar os dados do formulário para PDF
-function exportarPDF() {
-  const servico = document.getElementById('servico').value;
-  const executado = document.getElementById('executado').value;
-  const finalizado = document.getElementById('finalizado').value;
-  const obs = document.getElementById('obs').value;
-  const win = window.open('', '', 'width=800,height=600');
-  win.document.write('<html><head><title>Relatório de Serviços</title></head><body>');
-  win.document.write('<h2>Relatório de Serviços</h2>');
-  win.document.write(`<p><b>Serviço a ser realizado:</b> ${servico}</p>`);
-  win.document.write(`<p><b>Serviço executado por:</b> ${executado}</p>`);
-  win.document.write(`<p><b>Serviço finalizado:</b> ${finalizado}</p>`);
-  win.document.write(`<p><b>Observações:</b> ${obs}</p>`);
-  win.document.write('</body></html>');
-  win.document.close();
-  win.print();
+// Function to export current form data to PDF
+async function exportarPDF() {
+    const report = getFormData();
+    // jsPDF is available globally via the script tag
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text("Relatório de Serviço", 10, 10);
+
+    doc.setFontSize(12);
+    doc.text(`Data de Início: ${report.dataInicio}`, 10, 30);
+    doc.text(`Data de Finalização: ${report.dataFinalizado}`, 10, 40);
+    doc.text("Observações:", 10, 50);
+
+    // Split text to fit within PDF width
+    const splitObs = doc.splitTextToSize(report.observacoes, 180); // Max width 180mm
+    doc.text(splitObs, 10, 60);
+
+    doc.save("relatorio_servico.pdf");
+    alert("Relatório exportado como PDF!");
 }
 
-// Função para exportar por e-mail (Gmail)
+// Function to export current form data via Email
 function exportarEmail() {
-  const servico = document.getElementById('servico').value;
-  const executado = document.getElementById('executado').value;
-  const finalizado = document.getElementById('finalizado').value;
-  const obs = document.getElementById('obs').value;
-  const subject = encodeURIComponent('Relatório de Serviços');
-  const body = encodeURIComponent(
-    `Serviço a ser realizado: ${servico}\nServiço executado por: ${executado}\nServiço finalizado: ${finalizado}\nObservações: ${obs}`
-  );
-  window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=&su=${subject}&body=${body}`);
+    const report = getFormData();
+    const subject = encodeURIComponent("Relatório de Serviço");
+    const body = encodeURIComponent(
+        `Detalhes do Relatório:\n\n` +
+        `Data de Início: ${report.dataInicio}\n` +
+        `Data da Finalização: ${report.dataFinalizado}\n` +
+        `Observações: ${report.observacoes}`
+    );
+
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    alert("Seu cliente de e-mail será aberto com o relatório preenchido.");
 }
 
-let indiceEdicao = null;
-
-function salvarRelatorioNaTela(e) {
-  if (e) e.preventDefault();
-  const servico = document.getElementById('servico').value;
-  const executado = document.getElementById('executado').value;
-  const dataInicio = document.getElementById('data-inicio').value;
-  const dataFinalizado = document.getElementById('data-finalizado').value;
-  const obs = document.getElementById('obs').value;
-  const novoRelatorio = { servico, executado, dataInicio, dataFinalizado, obs };
-  let relatorios = JSON.parse(localStorage.getItem('relatoriosServicos')) || [];
-  if (indiceEdicao !== null) {
-    relatorios[indiceEdicao] = novoRelatorio;
-    indiceEdicao = null;
-  } else {
-    relatorios.push(novoRelatorio);
-  }
-  localStorage.setItem('relatoriosServicos', JSON.stringify(relatorios));
-  mostrarRelatoriosNaTela(relatorios);
-  // Limpa o formulário após salvar/editar
-  document.getElementById('servico').value = '';
-  document.getElementById('executado').value = '';
-  document.getElementById('data-inicio').value = '';
-  document.getElementById('data-finalizado').value = '';
-  document.getElementById('obs').value = '';
-}
-
-function mostrarRelatoriosNaTela(relatorios) {
-  const container = document.getElementById('relatorios-salvos');
-  if (!container) return;
-  if (relatorios.length === 0) {
-    container.classList.add('hidden');
-    return;
-  }
-  container.classList.remove('hidden');
-  let html = `<h2 class='text-xl font-bold mb-4'>Relatórios Salvos</h2>`;
-  relatorios.forEach((dados, idx) => {
-    html += `
-      <div class="bg-gray-100 p-4 rounded-lg shadow-inner mb-4">
-        <p class="text-gray-700"><span class="font-semibold">Serviço:</span> ${dados.servico}</p>
-        <p class="text-gray-700"><span class="font-semibold">Executado por:</span> ${dados.executado}</p>
-        <p class="text-gray-700"><span class="font-semibold">Data de Início:</span> ${dados.dataInicio || ''}</p>
-        <p class="text-gray-700"><span class="font-semibold">Data da Finalização:</span> ${dados.dataFinalizado || ''}</p>
-        <p class="text-gray-700"><span class="font-semibold">Observações:</span> ${dados.obs}</p>
-        <div class="flex gap-2 mt-2">
-          <button type="button" onclick="editarRelatorio(${idx})" class="bg-blue-500 text-white font-bold py-1 px-4 rounded hover:bg-blue-600 transition">Editar</button>
-          <button type="button" onclick="excluirRelatorio(${idx})" class="bg-red-500 text-white font-bold py-1 px-4 rounded hover:bg-red-600 transition">Excluir</button>
-        </div>
-      </div>
-    `;
-  });
-  container.innerHTML = html;
-}
-
-function carregarRelatoriosSalvos() {
-  let relatorios = JSON.parse(localStorage.getItem('relatoriosServicos')) || [];
-  mostrarRelatoriosNaTela(relatorios);
-}
-
-window.editarRelatorio = function(idx) {
-  let relatorios = JSON.parse(localStorage.getItem('relatoriosServicos')) || [];
-  const dados = relatorios[idx];
-  document.getElementById('servico').value = dados.servico;
-  document.getElementById('executado').value = dados.executado;
-  document.getElementById('data-inicio').value = dados.dataInicio || '';
-  document.getElementById('data-finalizado').value = dados.dataFinalizado || '';
-  document.getElementById('obs').value = dados.obs;
-  indiceEdicao = idx;
-  document.querySelector('form').scrollIntoView({ behavior: 'smooth' });
-}
-
-window.excluirRelatorio = function(idx) {
-  let relatorios = JSON.parse(localStorage.getItem('relatoriosServicos')) || [];
-  relatorios.splice(idx, 1);
-  localStorage.setItem('relatoriosServicos', JSON.stringify(relatorios));
-  mostrarRelatoriosNaTela(relatorios);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  carregarRelatoriosSalvos();
-  document.querySelector('form').addEventListener('submit', salvarRelatorioNaTela);
-});
+// Load saved reports when the page loads
+document.addEventListener('DOMContentLoaded', displaySavedReports);
